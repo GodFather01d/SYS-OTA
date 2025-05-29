@@ -15,6 +15,8 @@
 
   #define API_KEY "AIzaSyDM4F9Ca8XhdNJTDtQxeKV4uKlaTvhBDoA"
   #define DATABASE_URL "security-system-6ec5c-default-rtdb.firebaseio.com/"
+  #define USER_EMAIL "esp_data_in@gmail.com"
+  #define USER_PASSWORD "Jyotitelecom@2000"
 
  // volatile char* GITHUB_BIN_URL = "https://raw.githubusercontent.com/GodFather01d/SYS-OTA/main/SYS_26_10_2024.ino.bin";
 
@@ -43,7 +45,7 @@
   char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
   WiFiUDP ntpUDP;
   NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
-
+  String uid;
   Ticker timer,timer1;
   unsigned int sys_ON = 0,sys_OFF = 0, sys_PANIC_OFF = 0 ,sys_PANIC_ON = 0 ,hours_ontime = 0,mint_ontime = 0,hours_offtime = 0,notify = 0,DOOR_OPEN = 0;;
   unsigned int mint_offtime = 0, ontime_flag = 0, offtime_flag = 0, time_hours = 0, time_mint = 0, panic = 0, SYS_STATE,RESET = 0, panic_counter = 0;
@@ -53,7 +55,7 @@
   unsigned int reset_time = 60*240;
   unsigned int reset_counter = 0;
   unsigned char JT_PWRON_Flag = 0,JT_PWROFF_Flag = 0,JT_SYSON_Flag = 0,JT_SYSOFF_Flag = 0,JT_PANIC_Flag = 0,JT_BATTERY_OK_Flag = 0,JT_BATTERY_LOW_Flag = 0,JT_DOOR_OPEN_Flag =0;
-  unsigned char JT_OK_Flag = 0,send_hystory_flag = 0;
+  unsigned char JT_OK_Flag = 0;
   unsigned int doorNumber = 0;
   WiFiManager wm;
   int update_ota = 0;
@@ -106,11 +108,17 @@
         Firebase.begin(&config, &auth);
         Firebase.reconnectWiFi(true);
         delay(1000);
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BUTTONS/ADD_BUTTON", 0);
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BUTTONS/DELETE_BUTTON", 0);
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BUTTONS/CLEAR_BUTTON", 0);
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BUTTONS/PANIC_FROM_APP", 0);
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SYSTEM_ON_OFF_TIME/RESET", 0);
+      } 
+      if(signupOK)
+      {
+        Serial.println("Sign-in successful!");
+        Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+        String Button_path = "SYSTEM/" + String(sys_id) + "/BUTTONS/";
+        Firebase.setInt(fbdo, Button_path + "ADD_BUTTON", 0);
+        Firebase.setInt(fbdo, Button_path + "/DELETE_BUTTON", 0);
+        Firebase.setInt(fbdo, Button_path + "CLEAR_BUTTON", 0);
+        Firebase.setInt(fbdo, Button_path + "PANIC_FROM_APP", 0);
+        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SYSTEM_ON_OFF_TIME/RESET", 0); 
         Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SIREN_ON", 0);
 
 
@@ -125,13 +133,9 @@
           float  value = fbdo.floatData();
           off_time = value;
           }
+      }
         delay(1000);
-      }
-      else 
-      {
-        //Serial.printf("%s\n", config.signer.signupError.message.c_str());
-      }
-      digitalWrite(wifiLed, LOW);  
+        digitalWrite(wifiLed, LOW);
     }
     else
     {
@@ -143,11 +147,8 @@
     hours_offtime = off_time ;
     mint_offtime = (off_time - hours_offtime)*100 ;
     timer.attach(1, task);
-   // timer1.attach(1, panic_off);
-     attachInterrupt(digitalPinToInterrupt(TRIGGER_PIN), handleButtonPress, CHANGE);
 
-
-
+    attachInterrupt(digitalPinToInterrupt(TRIGGER_PIN), handleButtonPress, CHANGE);
   }
 
   void task()
@@ -231,21 +232,6 @@
      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/NOTIFICATION/" + sys_path + "/MIN", time_mint);
      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/NOTIFICATION/"+ sys_path + "/" + sys_path, 1);
   }
-  void sendhistory(String sys_path)
-  {
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/"+ sys_path +"/MONTH", currentMonth);  
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/"+ sys_path +"/DAY", currentDay);  
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/"+ sys_path +"/YEAR", currentYear); 
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/"+ sys_path +"/HR", time_hours); 
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/"+ sys_path +"/MIN", time_mint);  
-      Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SIREN_ON", 1);
-      if(sys_path == "DOOR_HISTORY")
-      {
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/DOOR_HISTORY/DOOR_OPEN", doorNumber); 
-        Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/DOOR_OPEN", doorNumber);
-      }
-      send_hystory_flag = 0;
-  }
   void handledata()
    {
     if(WiFi.status() == WL_CONNECTED) 
@@ -303,20 +289,19 @@
           Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BUTTONS/PANIC_FROM_APP", 0);
           Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/PANIC_FROM_SYS", 0);
           JT_SYSOFF_Flag = 1;
-          Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/DOOR_OPEN", 0);
           Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/ON_OFF_STATE", 0);
           Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SIREN_ON", 0);
 
         }
         if (strcmp(inputCharArray, "JT_PANIC") == 0) 
         {
-      
+                timeClient.update();
 
           JT_PANIC_Flag = 1;
           Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/PANIC", 1);
-          send_hystory_flag = 1;
-
-
+          Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SIREN_ON", 1);
+          String Panic_history_path = "Date_" + String(currentDay) +"_"  + String(currentMonth) + "_"+ String(currentYear) + "_Time_"+ String(time_hours) + "_" + String(time_mint);
+          Firebase.setBool(fbdo, "SYSTEM/" + String(sys_id) + "/PANIC_HISTORY/" + Panic_history_path , true);  
         }
          if (strncmp(inputCharArray, "JT_DOOR", 7) == 0) {
         // Extract the door number (assuming it's always in the form "XXX")
@@ -324,9 +309,16 @@
 
         // Check if the number is between 1 and 25
         if (doorNumber >= 1 && doorNumber <= 99) {
-            
+                timeClient.update();
+
+            // Firebase set operation including the full input string in the path
+            Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/DOOR_OPEN", doorNumber);
             JT_DOOR_OPEN_Flag = 1;
-            send_hystory_flag = 2;
+            String Door_history_path = "Door_No_" + String(doorNumber) + "_Date_" + String(currentDay) +"_"  + String(currentMonth) + "_"+ String(currentYear) + "_Time_"+ String(time_hours) + "_" + String(time_mint);
+            Firebase.setBool(fbdo, "SYSTEM/" + String(sys_id) + "/DOOR_HISTORY/" + Door_history_path, true);  
+
+            Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/SIREN_ON", 1);
+
         }
        }
        if (strcmp(inputCharArray, "JT_STS") == 0) 
@@ -458,17 +450,12 @@
          if (buttonPressed) return;
         if (Firebase.getInt(fbdo,"SYSTEM/" + String(sys_id) + "/BIT_SET/BIT_SET_BUTTON"))
         {
-          bit_set_flag = fbdo.intData();
-
-          if(bit_set_flag == 1)
+          if(fbdo.intData() == 1)
           {
-            if(Firebase.getInt(fbdo,"SYSTEM/" + String(sys_id) + "/BIT_SET/BIT_VALUE"))
-            {
-              bit_value = fbdo.intData();
-              Serial.println("JT_BIT" + String(bit_value));
-              Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BIT_SET/BIT_SET_BUTTON", 0);
-              delay(500);
-
+            if (Firebase.getString(fbdo, "SYSTEM/" + String(sys_id) + "/BIT_SET/BIT_VALUE")) {
+                String bit_value = fbdo.stringData();  // Use stringData() for string values
+                Serial.println("JT_BIT" + bit_value);
+                Firebase.setInt(fbdo, "SYSTEM/" + String(sys_id) + "/BIT_SET/BIT_SET_BUTTON", 0);
             }
           } 
         } 
@@ -533,16 +520,6 @@
             sendnotification("DOOR_NOTI");
             JT_DOOR_OPEN_Flag = 0;
           }
-          if(send_hystory_flag == 1)
-          {
-             sendhistory("PANIC_HISTORY");
-          }
-          if(send_hystory_flag == 2)
-          {
-             sendhistory("DOOR_HISTORY");
-          }
-            
-          
         }
       }
       else
